@@ -1,0 +1,170 @@
+//=== Seting Date into field Pay Period
+ON('new-record', function (event) {
+  var today = new Date();
+  SETVALUE('date', today);
+});
+
+
+
+
+//==Attempt to Code script to provide CUSP Pay Period format to "Pay Period" field.
+//ON('new-record', function(event) {
+//  var period = ['May 1'];
+//  var period2 = ['May 2'];
+  
+//  if ($time_stamp <= 2018-5-16){
+//    SETVALUE('$pay_period',period);
+//    else if ($time_stamp < 2018-5-16){
+//      SETVALUE('$pay_period',period2);
+//    }
+//  });
+      
+    
+
+
+
+//==get weather data for current punch in time and location.
+function getWeather() {
+  var apiKey = 'b9c39c7d38adfc17';
+
+  var options = {
+    url: 'https://api.wunderground.com/api/' + apiKey + '/conditions/q/' + LATITUDE() + ',' + LONGITUDE() + '.json'
+  };
+
+  REQUEST(options, function(error, response, body) {
+    if (error) {
+      ALERT('Error with request: ' + error);
+    } else {
+      var data = JSON.parse(body).current_observation;
+      SETVALUE('weather_summary', data.weather + ', ' + data.wind_string);
+    }
+  });
+}
+//This Trigger was set up by Alex at Fulcrum to use when update weather_summary
+// is buried in one or more levels into the app.
+ON('change-geometry', 'employee_time_sheet', getWeather);
+
+//====Hide Fields based upon ROLES
+ON('load-record', function(event) {
+var adminRoles = ['Owner', 'Manager', 'Field Lead','OperationsManager'];
+
+  // if the current role is one of the designated admin roles...
+  if (ISROLE(adminRoles)) {
+    // make the fields visible
+    SETHIDDEN('mgr_lead_or_ops', false);
+  }
+  ON('load_repeatable', 'employee_time_sheet', function(event) {
+    if (ISROLE(adminRoles)) {
+      SETHIDDEN('time_label','workers_comp_class','client', false);
+      SETHIDDEN('workers_comp_class', false);
+      SETHIDDEN('client', false);
+      
+    }
+  });
+});
+//==Set Customer/Client by Billing Code Choice List value
+//===Credit to Alex Fulcrum Tech Support
+//==5 4 2018
+ON('change','billing_code', function(event) {
+ var COCOtrgr = ['Admin COCO','Anonymus Donation COCO','Front Range Round Table','Fundraising COCO','Hayden Pass Fire','Lake County:Wild Fire Risk Reduction Grant','LAVWCD CDA','Wetmore','Wood Innovations','WoodSide','Cohesive Strategy'];
+ var ARWCtrgr=['Beulah Fire','Beulah Fire:CDPHE','Beulah Fire Fun 3',];
+
+//== Notes to describe process when complete
+  if (CONTAINS(COCOtrgr,CHOICEVALUE($billing_code))) {
+    SETVALUE('client','COCO');
+  } else if (CONTAINS(ARWCtrgr,CHOICEVALUE($billing_code))) {
+    SETVALUE('client','ARWC');
+  } else {
+    SETVALUE('client','CUSP');
+  }
+});
+//==Code to disable editing of status field for FieldPerson and Field Lead users
+ON('load-record', function(event) {
+  var fieldUserRoles = ['Standard User','FieldPerson','Field Lead'];
+
+  // if the current role is one of the designated field user roles...
+  if (ISROLE(fieldUserRoles)) {
+    // set the status field filter
+    SETSTATUSFILTER(['Current']);
+  }
+});
+
+//==Workers Comp Class Auto Populate based upon contents of Task field.
+//===Credit to Alex Fulcrum Tech Support
+//==4 23 2018
+//==5 25 2018 Revised to act as hidden trigger flag to notify accounting to 
+//==make change to employee default workers comp code in Quickbooks.
+//==Import to QB in notes Column??
+ON('change', 'task_this_punch', function(event) {
+  var loggingtrigr = ['Logging','Burning','Firefighting','Masticating'];
+  var admintrigr = ['CollabDvlpmnt','Admin','GIS','Outreach','Technology','Planning'];
+
+//== Notes to describe process when complete
+  if (CONTAINS(loggingtrigr,CHOICEVALUE($task_this_punch))) {
+    SETVALUE('workers_comp_class','Logging');
+  } else if (CONTAINS(admintrigr,CHOICEVALUE($task_this_punch))) {
+    SETVALUE('workers_comp_class','Default');
+  } else {
+    SETVALUE('workers_comp_class','Default');
+  }
+});
+
+// This Event Locks Time Card from editing once a signature has been received
+ON('edit-record', function (event) {
+  if ($employee_signature) {
+    DATANAMES().forEach(function(dataName) {
+            SETREADONLY(dataName, true);
+    });
+  }
+});
+
+//==Test script for setting qb_class from choice list selection
+// 5 29 2018
+//Alex from Fulcrum  Tested and Approved by Dave Brown
+
+ON('change', 'billing_code', function(event){
+  var choice_1 = ['Badger Flats','Bailey Slash','Beaver Ranch','Beulah Fire','Bruckman Property','Buffalo Creek','Catamount','Cathedral Ridge','Coop Burning','Conifer Meadows','Divide Slash','Elk Valley','Fairplay Slash','Fee For Service','Greater','WP Healthy','Green Mountain Ranch','Green Mtn Falls','Hayden Creek','Hayden Pass Fire','Junkins','Lake County','Maddox','Mueller State Park','Palmer Lake','Quinlan Gulch','Ranch Estates','Red Rock Ranch','Richmond Hill','Sand Gulch','Sourdough','Stedman Property','Tri Lakes','Ute Lakes','Wetmore','Woodside'];
+  var class_1 = 'Forest & Fuels';
+  var choice_2 = ['Horse Creek','Landis Ranch','Montgomery Reservoir','Noxious Weeds','Puma Hills River Ranch','Sand Creek Ranch'];
+  var class_2 = 'Habitat';
+  var choice_3=['Ark Basin WHIP','Cohesive Strategy','Front Range Round Table','SRSFN','Western Watersheds','Wood Innovations'];
+  var choice_4 = ['Admin COCO','Admin CUSP','Greenway','Crown'];
+  var class_3 = 'Collaborative Development';
+  var class_4 = 'Administrative';
+  var choice_5 =['Middle Fork Mines','Mushroom Study','South Platte Monitoring'];
+  var choice_6 =['Fossil Beds','Gill Trail','Sanborn'];
+  var class_5 ='Monitor Assess Plan';
+  var class_6 ='Recreation';
+  var choice_7 =['High Creek Fen'];
+  var choice_8 =['Fire Adapted Colorado','Wildfire Support'];
+  var class_7 ='Outreach & Education';
+  var class_8 ='Emergency Management';
+  var choice_9 =['Wood Innovations'];
+  var choice_10 =['Fundraising COCO','Fundraising CUSP'];
+  var class_9 ='Conservation & Sustainability';
+  var class_10 ='Fundraising';
+  
+//==Arguments for determining contents and setting of qb_class 
+  
+  if(CONTAINS(choice_1, CHOICEVALUE($billing_code))) {
+    SETVALUE('qb_class', class_1);
+  }else if(CONTAINS(choice_2, CHOICEVALUE($billing_code))){
+   SETVALUE('qb_class', class_2);
+  }else if(CONTAINS(choice_3, CHOICEVALUE($billing_code))){
+   SETVALUE('qb_class', class_3);
+  }else if(CONTAINS(choice_4, CHOICEVALUE($billing_code))){
+   SETVALUE('qb_class', class_4);
+  }else if(CONTAINS(choice_5,CHOICEVALUE($billing_code))){
+   SETVALUE('qb_class', class_5);
+  }else if(CONTAINS(choice_6,CHOICEVALUE($billing_code))){
+   SETVALUE('qb_class', class_6);
+  }else if(CONTAINS(choice_7,CHOICEVALUE($billing_code))){
+   SETVALUE('qb_class', class_7);
+  }else if(CONTAINS(choice_8,CHOICEVALUE($billing_code))){
+   SETVALUE('qb_class', class_8);
+  }else if(CONTAINS(choice_9,CHOICEVALUE($billing_code))){
+   SETVALUE('qb_class', class_9);
+  }else if(CONTAINS(choice_10,CHOICEVALUE($billing_code))){
+   SETVALUE('qb_class', class_10);
+  }
+});
